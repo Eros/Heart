@@ -1,4 +1,5 @@
 extern crate mio;
+extern crate http_muncher;
 use mio::*;
 use mio::tcp::*;
 use std::net::SocketAddr;
