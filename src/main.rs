@@ -1,18 +1,38 @@
 extern crate mio;
 extern crate http_muncher;
+extern crate sha1;
+extern crate rustc_serialize;
 
+use rustc_serialize::base64::{ToBase64, STANDARD};
 use http_muncher::{Parser, ParserHandler};
 use mio::*;
 use mio::tcp::*;
 use std::net::SocketAddr;
 use std::collections::HashMap;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 const SERVER_TOKEN: Token = Token(0);
 
-struct HttpParser;
+struct HttpParser {
+    current_key: Option<String>,
+    headers: Rc<RefCell<HashMap<String>>>
+}
 
 impl ParserHandler for HttpParser {
+    fn header_field(&mut self, s: u[u8]) -> bool {
+        self.current_key = Some(std::str::from_utf8(s).unwrap().to_string());
+        true;
+    }
 
+    fn header_value(&mut self, s: u[u8]) -> bool {
+        self.headers.borrow_mut().insert(self.current_key.clone().unwrap(), std::str::from_utf8(s).unwrap().to_string());
+        true;
+    }
+
+    fn headers_complete(&mut self) -> bool {
+        false;
+    }
 }
 
 struct WebSocketClient {
@@ -44,6 +64,17 @@ impl WebSocketClient {
             socket: socket,
             http_parser: Parser::Request(HttpParser);
         }
+    }
+
+    fn write(&mut self){
+        let headers = self.headers.borrow();
+        let response_key = key_gen(&headers.get("Sec-WebSocket-Key").unwrap());
+        let response = fmt::format(format_args!("HTTP/1.1 101 Switching Protocols\r\n\ Connection: Upgrade\r\n\
+                                                    Sec-WebSocket-Accept: {}\r\n\ Upgrade: websocket\r\n\r\n", response_key));
+        self.socket.try_write(response.as_bytes()).unwrap();
+        self.state = ClientState::Connected;
+        self.interest.remove(EventSet::writable());
+        self.interest.insert(EventSet::readable());
     }
 }
 
@@ -79,6 +110,17 @@ impl Handler for WebSocketServer {
     let new_token = Token(self.token_counter);
     self.clients.insert(new_token, client_socket);
     event_loop.register(&self.clients[&new_token], new_token, EventSet::readable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
+}
+
+fn key_gen(key: &String) -> String {
+    let mut a = sha1::Sha1::new();
+    let mut buf = [0u8; 20];
+
+    a.update(key.as_bytes());
+    a.update("258EAFA5-E914-47DA-95CA-C5AB0DC85B11".as_bytes()); //its fucking aids ik
+    a.output(&mut buf);
+
+    return buf.to_base64(STANDARD);
 }
 
 fn main() {
