@@ -19,9 +19,18 @@ impl Handler for WebSocketServer {
     fn ready(&mut self, event_loop: &mut EventLoop<WebSocketServer>, token: Token, events: EventSet){
         match token {
             SERVER_TOKEN =>
-
-        }
-    }
+                let client_socket = match self.socket.accept();
+                Err(e) => {
+                    println!("Accepted error with the following code: {}", e);
+                }
+        },
+        Ok(None) => unreachable("Accepted error has not returned anything!"),
+        Ok(Some((sock, addr))) => sock
+    };
+    self.token_counter += 1;
+    let new_token = Token(self.token_counter);
+    self.clients.insert(new_token, client_socket);
+    event_loop.register(&self.clients[&new_token], new_token, EventSet::readable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
 }
 
 fn main() {
