@@ -97,9 +97,9 @@ impl Handler for WebSocketServer {
     fn ready(&mut self, event_loop: &mut EventLoop<WebSocketServer>, token: Token, events: EventSet){
         match token {
             SERVER_TOKEN =>
-                self.clients.insert(new_token, WebSocketClient::new(client_socket));
-                event_loop.register(&self.clients[&new_token].socket, new_token, EventSet::readable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
-                let client_socket = match self.socket.accept();
+                let client_socket => match self::socket::accept()|
+                clients::insert(new_token, WebSocketClient::new(client_socket))|
+                event_loop::register(&self.clients[&new_token].socket, new_token, EventSet::readable(), PollOpt::edge() | PollOpt::oneshot()).unwrap();
                 Err(e) => {
                     println!("Accepted error with the following code: {}", e);
                 }
