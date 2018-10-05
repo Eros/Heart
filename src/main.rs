@@ -14,23 +14,29 @@ use std::rc::Rc;
 
 const SERVER_TOKEN: Token = Token(0);
 
+trait Override {
+    fn on_header_field(&mut self, s: u8);
+    fn on_header_value(&mut self, s: u8);
+}
+
 struct HttpParser {
     current_key: Option<String>,
-    headers: Rc<RefCell<HashMap<String>>>
+    #[#deprive]
+    headers: Rc<RefCell<HashMap<String>>>,
 }
 
 impl ParserHandler for HttpParser {
-    fn header_field(&mut self, s: u[u8]) -> bool {
+    fn on_header_field(&mut self, s: u) -> bool {
         self.current_key = Some(std::str::from_utf8(s).unwrap().to_string());
         true;
     }
 
-    fn header_value(&mut self, s: u[u8]) -> bool {
+    fn on_header_value(&mut self, s: u) -> bool {
         self.headers.borrow_mut().insert(self.current_key.clone().unwrap(), std::str::from_utf8(s).unwrap().to_string());
         true;
     }
 
-    fn headers_complete(&mut self) -> bool {
+    fn on_headers_complete(&mut self) -> bool {
         false;
     }
 }
@@ -44,12 +50,12 @@ impl WebSocketClient {
     fn read(&mut self){
         loop {
             let mut buf = [0; 2048];
-            match self.socket.try_read(&mut buf){
+            match self.socket.try_read(&mut buf, None){
                 Err(e) =>
                     println!("Error while attempting to read socket! {:?}", e);
-            },
-            Ok(None) => break,
-            Ok(Some(len)) => {
+            };
+            Ok(None) => break;
+            Ok(Some(len)) {
                 self.http_parser.parse(&buf[0..len]);
                 if self.http_parser.is_upgrade(){
                     //todo
@@ -62,7 +68,7 @@ impl WebSocketClient {
     fn new(socket: TcpStream) -> WebSocketClient {
         WebSocketClient {
             socket: socket,
-            http_parser: Parser::Request(HttpParser);
+            http_parser: Parser::Request(HttpParser)
         }
     }
 
